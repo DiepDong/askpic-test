@@ -1,23 +1,27 @@
-// cropUtils.js
-
-export async function getCroppedImg(imageSrc, pixelCrop, imageType = 'image/jpeg') {
+export async function getCroppedImg(imageSrc, crop, imageType = 'image/jpeg') {
   const image = await createImage(imageSrc);
+  const scaleX = image.naturalWidth / image.width;
+  const scaleY = image.naturalHeight / image.height;
+
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  const pixelRatio = window.devicePixelRatio;
+  canvas.width = crop.width * pixelRatio;
+  canvas.height = crop.height * pixelRatio;
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  ctx.imageSmoothingQuality = 'high';
 
   ctx.drawImage(
     image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
+    crop.x * scaleX,
+    crop.y * scaleY,
+    crop.width * scaleX,
+    crop.height * scaleY,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    crop.width * pixelRatio,
+    crop.height * pixelRatio,
   );
 
   return new Promise((resolve, reject) => {
@@ -26,8 +30,14 @@ export async function getCroppedImg(imageSrc, pixelCrop, imageType = 'image/jpeg
         reject(new Error('Canvas is empty'));
         return;
       }
-      resolve(blob);
-    }, imageType); // Truyền vào imageType để xác định định dạng ảnh đầu ra
+
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        resolve(base64data);
+      };
+    }, imageType);
   });
 }
 

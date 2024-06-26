@@ -1,20 +1,42 @@
 import React, { useState, useCallback } from "react";
-import { Flex, Group, Text, rem, Image, Button, ScrollArea, Highlight, Modal } from "@mantine/core";
-import { IconUpload, IconPhoto, IconX } from "@tabler/icons-react";
+import {
+  Flex,
+  Group,
+  Text,
+  rem,
+  Image,
+  Button,
+  ScrollArea,
+  Highlight,
+  Modal,
+} from "@mantine/core";
+import {
+  IconUpload,
+  IconPhoto,
+  IconX,
+  IconCheck,
+} from "@tabler/icons-react";
 import { Dropzone } from "@mantine/dropzone";
-import Cropper from 'react-easy-crop';
-import { getCroppedImg } from './cropUtils'; // Make sure this path is correct
+import { notifications } from "@mantine/notifications";
+import { v4 as uuidv4 } from "uuid";
+import ReactCrop from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
+import { getCroppedImg, createImage } from "./cropUtils";
 import { uploadFile } from "../../api/upload";
-import { notifications } from '@mantine/notifications';
-import { IconCheck } from '@tabler/icons-react';
-import { v4 as uuidv4 } from 'uuid';
 
 export default function Uploadcv(props) {
   const [acceptedFiles, setAcceptedFiles] = useState([]);
   const [questionsAndAnswers, setQuestionsAndAnswers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [crop, setCrop] = useState({
+    aspect: 4 / 3,
+    unit: "px",
+    width: 200,
+    height: 150,
+    x: 0,
+    y: 0
+  });
+  const [image, setImage] = useState(null);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
@@ -22,20 +44,16 @@ export default function Uploadcv(props) {
   const handleDrop = (files) => {
     setAcceptedFiles(files);
     setQuestionsAndAnswers([]);
-    console.log("accepted files", files);
-    setCropImageSrc(URL.createObjectURL(files[0]));
+    const imageUrl = URL.createObjectURL(files[0]);
+    setCropImageSrc(imageUrl);
     setIsCropping(true);
+    console.log("Image URL for cropping:", imageUrl);
   };
 
   const handleReject = () => {
     setAcceptedFiles([]);
     setQuestionsAndAnswers([]);
-    console.log("rejected files");
   };
-
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
 
   const handleGenerateQuestions = async () => {
     if (acceptedFiles.length === 0) {
@@ -49,15 +67,17 @@ export default function Uploadcv(props) {
 
     const id = notifications.show({
       loading: true,
-      title: 'Generating Answers from Questions',
-      message: 'Please wait...',
+      title: "Generating Answers from Questions",
+      message: "Please wait...",
       autoClose: false,
       withCloseButton: false,
     });
 
     try {
       const croppedImageBlob = await getCroppedImg(cropImageSrc, croppedAreaPixels);
-      const croppedFile = new File([croppedImageBlob], file.name, { type: file.type });
+      const croppedFile = new File([croppedImageBlob], file.name, {
+        type: file.type,
+      });
 
       const response = await uploadFile(croppedFile);
       console.log("API Response:", response);
@@ -67,14 +87,13 @@ export default function Uploadcv(props) {
 
         notifications.update({
           id,
-          color: 'teal',
-          title: 'Success',
-          message: 'Answers have been generated successfully!',
+          color: "teal",
+          title: "Success",
+          message: "Answers have been generated successfully!",
           icon: <IconCheck style={{ width: rem(18), height: rem(18) }} />,
           loading: false,
           autoClose: 5000,
         });
-
       } else {
         console.log("No questions and answers returned from API.");
         setQuestionsAndAnswers([]);
@@ -87,9 +106,42 @@ export default function Uploadcv(props) {
     }
   };
 
-  const handleCrop = async () => {
+  const handleImageLoaded = useCallback((image) => {
+    console.log("Image loaded:", image);
+    setImage(image);
+    setCrop((prevCrop) => ({
+      ...prevCrop,
+      aspect: image.width / image.height,
+      width: image.width * 0.5,
+      height: image.height * 0.5,
+      x: (image.width - (image.width * 0.5)) / 2,
+      y: (image.height - (image.height * 0.5)) / 2,
+    }));
+  }, []);
+
+  const handleCropChange = (newCrop) => {
+    setCrop(newCrop);
+  };
+
+  const handleCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    console.log("Crop complete:", croppedArea, croppedAreaPixels);
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropCancel = () => {
+    setIsCropping(false);
+  };
+
+  const handleCropConfirm = async () => {
+    if (!croppedAreaPixels || !image) {
+      console.error("No crop area selected or image not loaded.");
+      return;
+    }
+
     const croppedImageBlob = await getCroppedImg(cropImageSrc, croppedAreaPixels);
-    const croppedFile = new File([croppedImageBlob], acceptedFiles[0].name, { type: acceptedFiles[0].type });
+    const croppedFile = new File([croppedImageBlob], acceptedFiles[0].name, {
+      type: acceptedFiles[0].type,
+    });
     setAcceptedFiles([croppedFile]);
     setIsCropping(false);
   };
@@ -97,7 +149,11 @@ export default function Uploadcv(props) {
   return (
     <>
       <Flex style={{ height: "100%" }}>
-        <Flex direction="column" gap="sm" style={{ flex: 1, padding: "1rem 2rem", alignItems: "stretch" }}>
+        <Flex
+          direction="column"
+          gap="sm"
+          style={{ flex: 1, padding: "1rem 2rem", alignItems: "stretch" }}
+        >
           <Dropzone
             onDrop={handleDrop}
             onReject={handleReject}
@@ -109,7 +165,10 @@ export default function Uploadcv(props) {
               justify="center"
               gap="xl"
               mih={200}
-              style={{ pointerEvents: "none", textAlign: "center" }}
+              style={{
+                pointerEvents: "none",
+                textAlign: "center",
+              }}
             >
               {acceptedFiles.length === 0 && (
                 <>
@@ -173,17 +232,41 @@ export default function Uploadcv(props) {
           </Dropzone>
         </Flex>
 
-        <Flex direction="column" gap="sm" style={{ flex: 1, padding: "1rem 2rem", maxHeight: "100%", overflowY: "auto" }}>
+        <Flex
+          direction="column"
+          gap="sm"
+          style={{
+            flex: 1,
+            padding: "1rem 2rem",
+            maxHeight: "100%",
+            overflowY: "auto",
+          }}
+        >
           <ScrollArea h="77.5vh">
             {questionsAndAnswers.length > 0 ? (
-              <ul style={{ paddingInlineStart: "0", listStyleType: "none", margin: "0", padding: "0" }}>
+              <ul
+                style={{
+                  paddingInlineStart: "0",
+                  listStyleType: "none",
+                  margin: "0",
+                  padding: "0",
+                }}
+              >
                 {questionsAndAnswers.map((qa, index) => (
                   <li key={uuidv4()} style={{ marginBottom: "1rem" }}>
-                    <Text size="lg" weight={500} style={{ whiteSpace: "pre-line" }}>{qa.question}</Text>
+                    <Text
+                      size="lg"
+                      weight={500}
+                      style={{ whiteSpace: "pre-line" }}
+                    >
+                      {qa.question}
+                    </Text>
                     <div style={{ whiteSpace: "pre-line", marginTop: "0.5rem" }}>
-                      <span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>Answer:</span>
+                      <span style={{ fontWeight: "bold", textDecoration: "underline" }}>
+                        Answer:
+                      </span>
                       <span> </span>
-                      <Highlight style={{ display: 'inline' }} highlight={qa.answer}>
+                      <Highlight style={{ display: "inline" }} highlight={qa.answer}>
                         {qa.answer}
                       </Highlight>
                     </div>
@@ -191,43 +274,67 @@ export default function Uploadcv(props) {
                 ))}
               </ul>
             ) : (
-              <Text size="lg" color="dimmed">Answers will appear here after click view answer.</Text>
+              <Text size="lg" color="dimmed">
+                Answers will appear here after clicking "View Answers".
+              </Text>
             )}
           </ScrollArea>
         </Flex>
       </Flex>
 
-      <Group style={{ position: "fixed", inset: "auto 40px 40px auto", bottom: "30px", right: "40px" }}>
-        <Button variant="default" size="md" radius="xl" onClick={() => setAcceptedFiles([])}>Cancel</Button>
+      <Group
+        style={{
+          position: "fixed",
+          inset: "auto 40px 40px auto",
+          bottom: "30px",
+          right: "40px",
+        }}
+      >
+        <Button variant="default" size="md" radius="xl" onClick={() => setAcceptedFiles([])}>
+          Cancel
+        </Button>
         <Button
-          variant="filled"
           size="md"
           radius="xl"
           onClick={handleGenerateQuestions}
-          disabled={loading}
+          loading={loading}
+          disabled={acceptedFiles.length === 0}
         >
-          {loading ? "Generating..." : "View Answers"}
+          View Answers
         </Button>
       </Group>
-
-      <Modal opened={isCropping} onClose={() => setIsCropping(false)} title="Crop Image" size="80%">
-        <div className="crop-container" style={{ position: 'relative', width: '100%', height: '60vh' }}>
-          <Cropper
-            image={cropImageSrc}
-            crop={crop}
-            zoom={zoom}
-            aspect={4 / 3} // Change this to 0 for free aspect ratio
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
-            style={{ containerStyle: { backgroundColor: '#333' } }}
-          />
-        </div>
-        <Group position="center" mt="md">
-          <Button variant="default" onClick={() => setIsCropping(false)}>Cancel</Button>
-          <Button variant="filled" onClick={handleCrop}>Crop</Button>
+      <Modal
+        opened={isCropping}
+        onClose={handleCropCancel}
+        title="Crop Image"
+        size="lg"
+        centered
+      >
+        {cropImageSrc && (
+          <div style={{ width: "100%", height: "400px" }}>
+            <ReactCrop
+              src={cropImageSrc}
+              crop={crop}
+              onImageLoaded={handleImageLoaded}
+              onChange={handleCropChange}
+              onComplete={handleCropComplete}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "cover",
+              }}
+            />
+          </div>
+        )}
+        <Group position="right" mt="md">
+          <Button onClick={handleCropCancel}>Cancel</Button>
+          <Button onClick={handleCropConfirm}>Confirm</Button>
         </Group>
-      </Modal>
+      </Modal>;
+
+
+
     </>
   );
 }
+

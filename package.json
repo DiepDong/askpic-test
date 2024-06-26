@@ -30,6 +30,8 @@
     "@tiptap/pm": "^2.2.4",
     "@tiptap/react": "^2.4.0",
     "@tiptap/starter-kit": "^2.4.0",
+    "antd": "^5.18.3",
+    "antd-img-crop": "^4.22.0",
     "axios": "^1.6.7",
     "cropperjs": "^1.6.2",
     "dayjs": "^1.11.10",
