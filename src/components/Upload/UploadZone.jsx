@@ -132,19 +132,30 @@ export default function Uploadcv(props) {
     setIsCropping(false);
   };
 
-  const handleCropConfirm = async () => {
-    if (!croppedAreaPixels || !image) {
-      console.error("No crop area selected or image not loaded.");
-      return;
-    }
+const handleCropConfirm = async () => {
+  if (!croppedAreaPixels || !cropImageSrc) {
+    console.error("No crop area selected or image not loaded.");
+    return;
+  }
 
+  try {
     const croppedImageBlob = await getCroppedImg(cropImageSrc, croppedAreaPixels);
     const croppedFile = new File([croppedImageBlob], acceptedFiles[0].name, {
       type: acceptedFiles[0].type,
     });
+
+    // Update acceptedFiles with cropped image
     setAcceptedFiles([croppedFile]);
-    setIsCropping(false);
-  };
+    setIsCropping(false); // Close crop modal
+  } catch (error) {
+    console.error("Error cropping image:", error);
+    setIsCropping(false); // Close crop modal if there's an error
+  }
+};
+
+
+
+
 
   return (
     <>
@@ -228,6 +239,8 @@ export default function Uploadcv(props) {
                   ))}
                 </Flex>
               )}
+
+
             </Group>
           </Dropzone>
         </Flex>
@@ -313,17 +326,19 @@ export default function Uploadcv(props) {
         {cropImageSrc && (
           <div style={{ width: "100%", height: "400px" }}>
             <ReactCrop
-              src={cropImageSrc}
-              crop={crop}
-              onImageLoaded={handleImageLoaded}
               onChange={handleCropChange}
               onComplete={handleCropComplete}
-              style={{
-                maxWidth: "100%",
-                maxHeight: "100%",
-                objectFit: "cover",
-              }}
-            />
+              crop={crop}>
+              <img
+                src={cropImageSrc}
+                onImageLoaded={handleImageLoaded}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            </ReactCrop>
           </div>
         )}
         <Group position="right" mt="md">
@@ -331,9 +346,6 @@ export default function Uploadcv(props) {
           <Button onClick={handleCropConfirm}>Confirm</Button>
         </Group>
       </Modal>;
-
-
-
     </>
   );
 }
